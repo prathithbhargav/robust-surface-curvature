@@ -1,15 +1,75 @@
-from utils.imports import *
-# from utils.write_the_X_file import *
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Imports
+
+# In[1]:
+
+
+import os
+import sys
+import matplotlib.pyplot as plt
+from pathlib import Path
+import regex
+import glob
+import time
+import itertools
+from collections import namedtuple
+import collections
+import copy
+from scipy.spatial import distance
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+from math import sqrt
+from sys import stderr
+from numpy import linalg
+import networkx as nx
+import re
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.spatial import ConvexHull
 from utils.Hypersphere import fit_hypersphere
 from utils.read_msms import read_msms
-from utils.linear_algebra_functions import *
-# from utils.generate_the_complimentarity_plot import *
-from utils.PDB_reader import *
+from Bio.PDB.ResidueDepth import ResidueDepth
+from Bio.PDB.PDBParser import PDBParser
+from sklearn.preprocessing import StandardScaler
+from scipy.spatial import Delaunay, ConvexHull
+import pickle
+from scipy.spatial.distance import pdist
+from scipy.cluster.hierarchy import cophenet
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.cluster.hierarchy import fcluster
+from scipy.cluster.vq import kmeans, vq
+import scipy.cluster.hierarchy as sch
+from collections import OrderedDict
+import subprocess
+import unittest
+
+SMALL_SIZE = 10
+MEDIUM_SIZE = 13
+BIGGER_SIZE = 13
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+plt.rcParams.update({'figure.autolayout': True})
+
+
+# # Defining the Input and the Output Folder Name
+
+# In[2]:
 
 list_of_arguements = sys.argv
 
 input_folder_name = list_of_arguements[1]
 output_folder_name = list_of_arguements[2]
+
+# input_folder_name = 'Protein-inhibitor'
+# output_folder_name = 'output_protein-ligand'
 
 path = Path(os.path.abspath('./data/'))
 sub_path = Path(os.path.abspath('./data/'+input_folder_name))
@@ -31,10 +91,12 @@ for files in glob.glob(sub_path.as_posix()+"/*.dms"): #gets files having .dms ex
         s1 = structure_id #s1 becomes structure ID
         new_df = pd.DataFrame({'file_id':[s1],'file_path':[filename]})
         df_of_dms_files = pd.concat([df_of_dms_files,new_df],ignore_index=True)
-#     df_of_dms_files=pd.concat(df_of_dms_files,pd.DataFrame({'file_id':s1,'file_path':filename}),ignore_index=True)
-# df_of_dms_files
 
-def write_pdb_X_file(filename,s1,path,sub_path,OUTPUT):
+
+# In[3]:
+
+
+def write_pdb_X_file(filename,s1):
 
     with open(filename, 'r') as f:
         k = f.read()
@@ -102,13 +164,17 @@ def write_pdb_X_file(filename,s1,path,sub_path,OUTPUT):
                 curvature[tuple(x)] = B*-100/curv_m[0]**1  # put - sign
 
     j = 0
+    # j is a line
     with open(os.path.expanduser(path.as_posix()+'/%s/%s_%s.pdb' % (OUTPUT, s1, 'X')), 'w') as f:
         for _, x in enumerate(curvature.keys()):
 
             loc1 = iterables1[tuple(x)]
             loc = loc1[0].split()
-            print("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}".format("ATOM", j, "A", " ", loc[0], "X",
-                                                                                                                                  int(loc[1].rstrip(regex.search(r'(\d+)(.*)', loc[1]).group(2))), '', x[0], x[1], x[2], loc1[1][0],  curvature[tuple(x)], '', loc[2]), file=f)
+            print("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}     {:8.3f}  {:8.3f}  {:8.3f}  {:6.2f}  {:6.2f}          {:>2s}{:2s}".format("ATOM", j, "A", " ", loc[0], "X", 
+                                                                                                                                  int(loc[1].rstrip(regex.search(r'(\d+)(.*)',
+                                                                                                                                  loc[1]).group(2))), '', 
+                                                                                                                                  x[0], x[1], x[2], loc1[1][0], 
+                                                                                                                                  curvature[tuple(x)], '', loc[2]), file=f)
 
             j += 1
 
@@ -121,19 +187,23 @@ def write_pdb_X_file(filename,s1,path,sub_path,OUTPUT):
     plt.ylabel("number of surface points")
     plt.title('%s %s:Number of surface points: %d\nScaling factor: 100*$\kappa$' %
               (s1.upper(), "", len(dist)))
+
     plt.hist(dist, bins=15, color='gray', alpha=0.8)
     plt.savefig(os.path.expanduser(path.as_posix()+'/%s/%s_%s_%s hist.jpeg' %
                                    (OUTPUT, dots, s1, 'X')), format='jpeg', dpi=300)
-#     plt.show()
-"""
-Protein - Ligand
+    # plt.show()
 
-"""
-def generate_the_complimentarity_plot(path,sub_path,OUTPUT):
-    
+
+# # Creating the final Histogram of Shape Complimentarity
+
+# In[4]:
+
+
+def generate_the_complimentarity_plot():
     pdb_id = collections.defaultdict(list)
     dms_id = collections.defaultdict(list)
     dms_path = os.path.expanduser(sub_path.as_posix()+"/*.dms")
+    column_list = [i for i in range(12)]
 
     for files in glob.glob(dms_path):
         filename = files
@@ -146,6 +216,7 @@ def generate_the_complimentarity_plot(path,sub_path,OUTPUT):
     for name_dms in dms_id:
         with open(dms_id[name_dms][0], 'r') as f:
             k = f.read()
+        
         pattern = re.compile(r"(.{20,})(?:\bA\b)", flags=re.M | re.I)
         pattern2 = re.compile(r"(.{20,})(?:\bS\w+\b)(.+)", flags=re.M)
         l1 = pattern.findall(k)
@@ -162,38 +233,39 @@ def generate_the_complimentarity_plot(path,sub_path,OUTPUT):
 
     for files in glob.glob((path/OUTPUT).as_posix()+"/*.pdb"):
         filename = files
-        structure_id = regex.search(
-            r"(?:.+/)(.{4})(?:.*_X\.pdb)", filename).group(1)
+        structure_id = regex.search(r"(?:.+/)(.{4})(?:.*_X\.pdb)", filename).group(1)
         pdb_id[structure_id].append(filename)
 
 
     for name_pdb in pdb_id:
         for i in itertools.combinations(pdb_id[name_pdb], 2):
-            # print(i)
-            with open(i[0], 'r') as f:
-                k = f.readlines()
             iterables = {}
+            k = pd.read_csv(str(i[0]),names=column_list,sep='\s+')
             arr1 = []
             arr1_norm = []
             if(regex.search(r"_lig_X", i[0])):
                 suffix = "_lig"
             else:
                 suffix = ""
-            for x in k:
-                iterables.setdefault(x[60:66].replace(" ", ""), []).append(list
-                                                                           (map(float, [x[30:38].replace(" ", ""),
-                                                                                        x[38:46].replace(
-                                                                                            " ", ""),
-                                                                                        x[46:54].replace(" ", "")])))
-                arr1.append(list(map(float, [x[30:38].replace(" ", ""),
-                                             x[38:46].replace(" ", ""),
-                                             x[46:54].replace(" ", ""), x[60:66].replace(" ", "")])))
-                arr1_norm.append(dms_normal[name_pdb+suffix][tuple(map(float, [x[30:38].replace(" ", ""),
-                                                                               x[38:46].replace(
-                                                                                   " ", ""),
-                                                                               x[46:54].replace(" ", "")]))])
-            with open(i[1], 'r') as f:
-                k1 = f.readlines()
+            for x in range(len(k)):
+                #value you need  = k.iloc[x][10]
+                #x[30:38].replace(" ", "") replace by k.iloc[x][6]
+                #x[38:46] replace by k.iloc[x][7]
+                #x[46:54] k.iloc[x][8]
+                #x[60:66] k.iloc[x][10]
+                iterables.setdefault(k.iloc[x][10], []).append(list(map(float, [k.iloc[x][6],
+                                                                                k.iloc[x][7],
+                                                                                k.iloc[x][8]])))
+                arr1.append(list(map(float, [k.iloc[x][6],
+                                             k.iloc[x][7],
+                                             k.iloc[x][8], 
+                                             k.iloc[x][10]])))
+                arr1_norm.append(dms_normal[name_pdb+suffix][tuple(map(float, [k.iloc[x][6],
+                                                                               k.iloc[x][7],
+                                                                               k.iloc[x][8]]))])
+
+            k1 = pd.read_csv(str(i[1]),sep='\s+',names=column_list)
+            
 
             iterables1 = {}
             arr2 = []
@@ -202,73 +274,57 @@ def generate_the_complimentarity_plot(path,sub_path,OUTPUT):
                 suffix = "_lig"
             else:
                 suffix = ""
-            for x in k1:
-                iterables1.setdefault(x[60:66].replace(" ", ""), []).append(list
-                                                                            (map(float, [x[30:38].replace(" ", ""),
-                                                                                         x[38:46].replace(
-                                                                                             " ", ""),
-                                                                                         x[46:54].replace(" ", "")])))
-                arr2.append(list(map(float, [x[30:38].replace(" ", ""),
-                                             x[38:46].replace(" ", ""),
-                                             x[46:54].replace(" ", ""), x[60:66].replace(" ", "")])))
-                arr2_norm.append(dms_normal[name_pdb+suffix][tuple(map(float, [x[30:38].replace(" ", ""),
-                                                                               x[38:46].replace(
-                                                                                   " ", ""),
-                                                                               x[46:54].replace(" ", "")]))])
-            arr1 = np.array(arr1)
-            arr2 = np.array(arr2)
-            arr1_norm = np.array(arr1_norm)
-            arr2_norm = np.array(arr2_norm)
-            arr1 = da.from_array(arr1)
-            arr1_norm = da.from_array(arr1_norm)
-            arr2 = da.from_array(arr2)
-            arr2_norm = da.from_array(arr2_norm)
-            # print('works')
-            normal_product = da.dot(arr2_norm, arr1_norm.T)
-            # print('worksNP')
-            arr_dist = dask_distance.euclidean(
-                arr2[:, 0:3], arr1[:, 0:3])
-            # print('cdist')
-            new_dist = da.exp(-1*(arr_dist-da.mean(arr_dist, axis=0))
-                              ** 2/(2*da.var(arr_dist, axis=0)))
+            for x in range(len(k1)):
+                iterables1.setdefault(k1.iloc[x][10], []).append(list(map(float, [k1.iloc[x][6],
+                                                                                k1.iloc[x][7],
+                                                                                k1.iloc[x][8]])))
+                arr2.append(list(map(float, [k1.iloc[x][6],
+                                             k1.iloc[x][7],
+                                             k1.iloc[x][8], 
+                                             k1.iloc[x][10]])))                
+                arr2_norm.append(dms_normal[name_pdb+suffix][tuple(map(float, [(k1.iloc[x][6]),
+                                                                               (k1.iloc[x][7]),
+                                                                               (k1.iloc[x][8])]))])                                                                 
+    arr1 = np.array(arr1)
+    arr2 = np.array(arr2)
+    arr1_norm = np.array(arr1_norm)
+    arr2_norm = np.array(arr2_norm)
+    normal_product = np.dot(arr2_norm, arr1_norm.T)
 
-            new_curv = dask_distance.cityblock(arr2[:,3:4], -1*arr1[:, 3:4])
-            new_curv = da.asarray(new_curv,chunks=(500,500))
-            new_dist = da.asarray(new_dist,chunks=(500,500))
-            new_dist.compute()
-            dat_new = (da.multiply(new_curv, new_dist)).flatten()
-#             length_of_array = dat_new.size
-#             value_division = length_of_array//5
-#             hist_final = np.zeros((10))
-#             p = pd.DataFrame(dat_new)
-#             for n in range(5):
-#                 hist,bins = da.histogram(dat_new[n*value_division:n+1*value_division].compute(),bins=20, range=[0,100])
-                
-            
-#             dat_new = dat_new.compute()
-#             print(dat_new)
-#             length = len(dat_new)
-#             hist, bin_edges = da.histogram(dat_new, bins=10, range=dat_new.)
-#             h = hist.compute()
-#             hist = hist.compute()
-#             plt.bar(bin_edges[:int(-1)], hist)
-#             h, bins = da.histogram(dat_new, bins=20, range=[0,100],density=True)
-#             h_final = h.compute(ch)
-#             plt.hist(h_final,bins)
+    arr_dist = distance.cdist(
+        arr2[:, (0, 1, 2)], arr1[:, (0, 1, 2)], 'euclidean')
 
-            plt.hist(dat_new, bins=20, density=True, color='gray', alpha=0.8)
-            plt.title("%s_%s" % (name_pdb, "_lig"))
+    new_dist = np.exp(-1*(arr_dist-np.mean(arr_dist, axis=0))
+                      ** 2/(2*np.var(arr_dist, axis=0)))
 
-            plt.savefig(path.as_posix()+"/%s_%s_plot.jpeg" %
-                        (name_pdb, "_lig"), format='jpeg', 
-                        dpi=300)
-            plt.show()
+    new_curv = distance.cdist(arr2[:, (3,)], -1*arr1[:, (3,)], 'cityblock')
+    dat_new = (np.multiply(new_curv, new_dist)).flatten()
+    plt.figure(dpi=300)
+
+    plt.xlabel("shape complementarity")
+    plt.ylabel("Number density")
+    plt.hist(dat_new, bins=20, density=True, color='gray', alpha=0.8)
+    plt.title("%s_%s" % (name_pdb, "_lig"))
+    # plt.show()
+    plt.savefig(path.as_posix()+"/%s_%s_plot.jpeg" %
+                (name_pdb, "_lig"), format='jpeg', dpi=300)
+    plt.close()
+
+
+# In[5]:
+
 
 for i in range(2):
     filename = df_of_dms_files.iloc[i][1]
     s1 = df_of_dms_files.iloc[i][0]
-    write_pdb_X_file(filename=filename,s1=s1,path = path,sub_path=sub_path,OUTPUT=OUTPUT)
+    write_pdb_X_file(filename=filename,s1=s1)
+    print('done with generation of PDB X file for ',s1)
     time.sleep(2)
-print('Done with generation of the X files')
-generate_the_complimentarity_plot(path,sub_path,OUTPUT)
-print('Done with generation of the complimentary plot')
+
+
+# In[6]:
+
+
+generate_the_complimentarity_plot()
+print('done with the generation of the complementarity plot')
+

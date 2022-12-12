@@ -1,5 +1,5 @@
 # this file is written for the generation of sh files
-folder_name='210_pdbs'
+folder_name='data/1cdt'
 cd $folder_name
 for file in *.pdb
 do 
