@@ -67,7 +67,8 @@ list_of_arguements = sys.argv
 
 input_folder_name = list_of_arguements[1]
 output_folder_name = list_of_arguements[2]
-
+T_value = float(list_of_arguements[3])
+T_str = str(list_of_arguements[3])
 # input_folder_name = 'Protein-inhibitor'
 # output_folder_name = 'output_protein-ligand'
 
@@ -128,7 +129,7 @@ def write_pdb_X_file(filename,s1):
     data = np.array([x for x in iterables1.keys()])
     data = np.array(data, 'float64')
     Z = linkage(data, 'complete')  # ward --> complete
-    max_d = 5  # patch
+    max_d = T_value  # patch
     clusters = fcluster(Z, max_d, criterion='distance')
     curvature = collections.defaultdict(list)
     centroid = np.median(data, axis=0)
@@ -306,8 +307,8 @@ def generate_the_complimentarity_plot():
     plt.hist(dat_new, bins=20, density=True, color='gray', alpha=0.8)
     plt.title("%s_%s" % (name_pdb, "_lig"))
     # plt.show()
-    plt.savefig(path.as_posix()+"/%s_%s_plot.jpeg" %
-                (name_pdb, "_lig"), format='jpeg', dpi=300)
+    plt.savefig(path.as_posix()+"/%s_%s_plot_T_%s.jpeg" %
+                (name_pdb, "_lig",T_str), format='jpeg', dpi=300)
     plt.close()
 
 
